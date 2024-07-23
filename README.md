@@ -1,7 +1,7 @@
 A very quickly written library to calculate the entropy of pixels in each line of an image.
 A use-case is to differentiate between an artistic image, or a professional document.
 
-```
+```Rust
 /// Calculates the entropy of an image.
 /// ### Parameters
 /// - `img_path` - The path to the image
