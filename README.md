@@ -15,3 +15,7 @@ pub fn calculate_image_entropy(img_path: &str, slice_percentage: Option<f64>) ->
 - Load image in buffer instead of as whole
     - Probably needs a full re-write to do LOL but worth it
 - Optional multi-threading
+
+
+### Using different slices
+![results](results.png)

@@ -1,6 +1,6 @@
 use image::{GenericImageView, Pixel};
-use std::collections::HashMap;
 use rand::prelude::SliceRandom;
+use std::collections::HashMap;
 
 /// Calculates the entropy of an image.
 /// ### Parameters
@@ -13,11 +13,16 @@ pub fn calculate_image_entropy(img_path: &str, slice_percentage: Option<f64>) ->
     let (width, height) = img.dimensions();
 
     let lines_to_sample: Vec<u32> = if let Some(percentage) = slice_percentage {
-        let num_lines = (height as f64 * percentage / 100.0).round() as u32;
-        let mut rng = rand::thread_rng();
-        let mut line_indices: Vec<u32> = (0..height).collect();
-        line_indices.shuffle(&mut rng);
-        line_indices.into_iter().take(num_lines as usize).collect()
+        if percentage >= 100.0 {
+            (0..height).collect()
+        } else {
+            let percentage = percentage.clamp(1.0, 100.0);
+            let num_lines = (height as f64 * percentage / 100.0).round() as u32;
+            let mut rng = rand::thread_rng();
+            let mut line_indices: Vec<u32> = (0..height).collect();
+            line_indices.shuffle(&mut rng);
+            line_indices.into_iter().take(num_lines as usize).collect()
+        }
     } else {
         (0..height).collect()
     };
@@ -39,21 +44,35 @@ pub fn calculate_image_entropy(img_path: &str, slice_percentage: Option<f64>) ->
     })
 }
 
-
 mod tests {
     use super::*;
     use dotenv::dotenv;
+
     #[test]
     fn test_calculate_image_entropy() {
-
         dotenv().ok();
 
+        let mut plots: HashMap<String, Vec<u128>> = HashMap::new();
+
+        let mut intervals = vec![10.0];
+        {
+            let mut current_value = 10.0;
+            while current_value < 100.0 {
+                current_value += 10.0;
+                if current_value < 100.0 {
+                    intervals.push(current_value);
+                }
+            }
+        }
         // Load from ENV
-        let testing_folder_loc = std::env::var("TEST_DIR").expect("Missing `TEST_DIR` environment variable");
-        let image_extensions = vec!["jpg", "jpeg", "png", "bmp", "gif", "tiff", "webp"];
+        let testing_folder_loc =
+                std::env::var("TEST_DIR").expect("Missing `TEST_DIR` environment variable");
 
         // Gather image related file paths
         let mut image_paths = vec![];
+        let image_extensions = vec!["jpg", "jpeg", "png", "bmp", "gif", "tiff", "webp"];
+        let limit = 10;
+
         for extension in image_extensions {
             let pattern = format!("{}/**/*.{}", testing_folder_loc, extension);
             for entry in glob::glob(&pattern).unwrap() {
@@ -66,18 +85,34 @@ mod tests {
             }
         }
 
-        let limit = 10;
+        let mut master_lapsed_time = 0;
 
-        let mut total_elapsed_time = 0;
+        for interval in intervals { 
+            let mut interval_plots: Vec<u128> = Vec::new();
+            let mut interval_elapsed_time = 0;
 
-        for img_path in image_paths.iter().take(limit) {
-            let start = std::time::Instant::now();
-            let entropy = calculate_image_entropy(img_path, Some(10.0));
-            let elapsed = start.elapsed().as_millis();
-            total_elapsed_time += elapsed;
-            println!("Path: {}\nEntropy: {}\nTime: {}ms\n----------------", img_path, entropy, elapsed);
+            for img_path in image_paths.iter().take(limit) {
+                let start = std::time::Instant::now();
+                let entropy = calculate_image_entropy(img_path, Some(interval));
+                let elapsed = start.elapsed().as_millis();
+                interval_plots.push(elapsed);
+                interval_elapsed_time += elapsed;
+                println!(
+                    "Path: {}\nEntropy: {}\nTime: {}ms\n----------------",
+                    img_path, entropy, elapsed
+                );
+            }
+
+            plots.insert(interval.to_string(), interval_plots);
+
+            master_lapsed_time += interval_elapsed_time;
+
+            println!("Interval elapsed time: {}s", (interval_elapsed_time / 1000));
+            println!("Average elapsed time: {}ms", interval_elapsed_time / limit as u128);
+            println!("Total elapsed time: {}s", (master_lapsed_time / 1000));
+            println!("Estimated time per interval: {}s", (master_lapsed_time as f64 / 1000.0) / (interval / 10.0));
         }
 
-        println!("Total elapsed time: {}s", (total_elapsed_time / 1000));
+        println!("Plots: {:?}", plots);
     }
 }
